@@ -3,6 +3,7 @@
 
     <string name="app_name">Mealbookers</string>
     <string name="action_login">Sign in</string>
+    <string name="action_logout">Sign out</string>
     <string name="email">Email address</string>
     <string name="password">Password</string>
     <string name="sign_in">Sign in</string>

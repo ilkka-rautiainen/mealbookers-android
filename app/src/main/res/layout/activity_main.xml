@@ -13,6 +13,13 @@
         android:layout_height="wrap_content"
         android:background="?attr/colorPrimary" />
 
+    <ProgressBar android:id="@+id/progress_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        style="@android:style/Widget.DeviceDefault.ProgressBar.Horizontal"
+        android:layout_marginTop="-7dp"
+        android:layout_marginBottom="-7dp" />
+
     <WebView
         android:layout_width="match_parent"
         android:layout_height="match_parent"

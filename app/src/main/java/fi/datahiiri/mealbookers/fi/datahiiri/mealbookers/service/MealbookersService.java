@@ -1,6 +1,5 @@
 package fi.datahiiri.mealbookers.fi.datahiiri.mealbookers.service;
 
-import android.app.AlarmManager;
 import android.app.IntentService;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -12,21 +11,16 @@ import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.SystemClock;
 import android.os.Vibrator;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
 
 import com.google.android.gms.gcm.GoogleCloudMessaging;
 
-import java.util.Calendar;
-import java.util.Date;
-
 import fi.datahiiri.mealbookers.LoginActivity;
 import fi.datahiiri.mealbookers.MainActivity;
 import fi.datahiiri.mealbookers.R;
 import fi.datahiiri.mealbookers.models.PushNotification;
-import fi.datahiiri.mealbookers.models.PushNotificationResult;
 
 /**
  * Created by Lisa och Ilkka on 18.2.2015.
@@ -84,6 +78,7 @@ public class MealbookersService extends IntentService {
                     Log.i("MealbookersService", "received intent: " + extras.toString());
 
                     String pushNotificationString = extras.getString("notification");
+                    Log.d("MealbookersService", "String length: " + Integer.toString(pushNotificationString.getBytes("ASCII").length));
                     PushNotification pushNotification = MealbookersGateway.getGson().fromJson(pushNotificationString, PushNotification.class);
                     if (pushNotification == null) {
                         Log.e("MealbookersService", "Push notification was null");
@@ -116,17 +111,7 @@ public class MealbookersService extends IntentService {
         catch (Exception e) {
             Log.e("MealbookersService.onHandleIntent", "processing failed", e);
 //            mHandler.post(new DisplayToast(this, "Fetching Mealbookers notifications failed"));
-            setNextAlert();
         }
-    }
-
-    /**
-     * Saves the last sync time to local preferences
-     * @param time
-     */
-    private void saveSyncTime(int time) {
-        final SharedPreferences prefs = this.getSharedPreferences(LoginActivity.PREFERENCES_FILENAME, Context.MODE_PRIVATE);
-        prefs.edit().putInt("sync-time", time).apply();
     }
 
     private Integer getLastSyncTime() {
@@ -137,89 +122,6 @@ public class MealbookersService extends IntentService {
         }
         else {
             return syncTime;
-        }
-    }
-
-    /**
-     * Shows notifications
-     * @param notificationResult
-     */
-    private void showNotifications(PushNotificationResult notificationResult) {
-        Integer takeNewerThan = getLastSyncTime();
-
-        // Take only this old notifications
-        int earliestAcceptedNotificationTime = Math.round(new Date().getTime() / 1000) - LoginActivity.NOTIFICATION_LIFETIME;
-        if (takeNewerThan == null || takeNewerThan < earliestAcceptedNotificationTime) {
-            takeNewerThan = earliestAcceptedNotificationTime;
-        }
-
-        for (PushNotification pushNotification : notificationResult.notifications) {
-            if (pushNotification.time > takeNewerThan) {
-                if (pushNotification.type == PushNotification.NOTIFICATION_TYPE_SUGGEST && pushNotification.suggestion == null) {
-                    continue;
-                }
-                Log.d("showNotifications", "showing notification of type" + Integer.toString(pushNotification.type));
-                sendNotification(pushNotification);
-            }
-        }
-    }
-
-    /**
-     * Sets next wakeup for the service according to the time interval.
-     */
-    private void setNextAlert() {
-        AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
-
-        Intent alarmIntent = new Intent(this, MealbookersService.class);
-        PendingIntent pending = PendingIntent.getService(this, 0, alarmIntent, 0);
-
-        alarmManager.set(AlarmManager.ELAPSED_REALTIME_WAKEUP,
-                SystemClock.elapsedRealtime() + getCheckInterval() * 1000, pending);
-    }
-
-    /**
-     * Gets the current wakeup interval.
-     * @return
-     */
-    private int getCheckInterval() {
-        Calendar c = Calendar.getInstance();
-        int dayOfWeek = c.get(Calendar.DAY_OF_WEEK);
-        int hourOfDay = c.get(Calendar.HOUR_OF_DAY);
-        int minutes = c.get(Calendar.MINUTE);
-        int time = hourOfDay * 100 + minutes;
-//        return 5;
-        if (dayOfWeek != Calendar.SATURDAY && dayOfWeek != Calendar.SUNDAY) {
-//        17:15 -> 09:00 -> 1h
-//        09:00 -> 09:45 -> 15min
-//        09:45 -> 10:50 -> 7min
-//        10:50 -> 12:50 -> 2min
-//        12:50 -> 17:15 -> 15min
-            if (time < 900) {
-                return 60 * 60;
-            } else if (time < 945) {
-                return 60 * 15;
-            } else if (time < 1050) {
-                return 60 * 7;
-            } else if (time < 1250) {
-                return 60 * 2;
-            } else if (time < 1750) {
-                return 60 * 15;
-            } else {
-                return 60 * 60;
-            }
-        } else if (dayOfWeek == Calendar.SATURDAY) {
-            if (time < 900) {
-                return 60 * 60;
-            } else if (time < 1400) {
-                return 60 * 15;
-            } else if (time < 1730) {
-                return 60 * 30;
-            } else {
-                return 60 * 60;
-            }
-        // Sunday
-        } else {
-            return 60 * 60;
         }
     }
 
@@ -274,6 +176,13 @@ public class MealbookersService extends IntentService {
     }
 
     /**
+     * Returns the text for expanded suggestion notification
+     */
+    private String getBigText(PushNotification pushNotification) {
+        return getText(pushNotification) + "\n" + pushNotification.menu;
+    }
+
+    /**
      * Sends notification to android notification drawer.
      * @param pushNotification
      */
@@ -304,16 +213,23 @@ public class MealbookersService extends IntentService {
 
         if (pushNotification.type == PushNotification.NOTIFICATION_TYPE_SUGGEST) {
             // Accept action
-            Intent acceptIntent = new Intent(getApplicationContext(), MainActivity.class);
+            Intent acceptIntent = new Intent(this, AcceptService.class);
+            acceptIntent.setAction("accept");
+//            this.getSharedPreferences(LoginActivity.PREFERENCES_FILENAME, Context.MODE_PRIVATE).edit().putString("accept-suggestion-token", pushNotification.token).commit();
             acceptIntent.putExtra("requestCode", MainActivity.REQUEST_CODE_NOTIFICATION_ACCEPT);
             acceptIntent.putExtra("token", pushNotification.token);
-            PendingIntent acceptPendingIntent = PendingIntent.getActivity(
-                    getApplicationContext(),
+            PendingIntent acceptPendingIntent = PendingIntent.getService(
+                    this,
                     MainActivity.REQUEST_CODE_NOTIFICATION_ACCEPT,
                     acceptIntent,
                     PendingIntent.FLAG_UPDATE_CURRENT
             );
             mBuilder.addAction(R.drawable.ic_done_grey600_24dp, getResources().getString(R.string.accept), acceptPendingIntent);
+
+            if (pushNotification.menu != null && !pushNotification.menu.isEmpty()) {
+                mBuilder.setStyle(new NotificationCompat.BigTextStyle()
+                    .bigText(getBigText(pushNotification)));
+            }
         }
 
 

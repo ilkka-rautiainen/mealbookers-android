@@ -8,14 +8,18 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Bundle;
 import android.support.v7.app.ActionBarActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
+import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import android.widget.ProgressBar;
 import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
@@ -53,10 +57,13 @@ public class MainActivity extends ActionBarActivity {
     String SENDER_ID = "481971064112";
 
     private WebView mWebView;
+    private ProgressBar mProgressBar;
+    private Menu mMenu;
 
     GoogleCloudMessaging gcm;
     String regid;
     Context context;
+    private boolean webViewLoading = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -65,9 +72,9 @@ public class MainActivity extends ActionBarActivity {
 
         context = getApplicationContext();
 
-        setupActionBar();
+        mProgressBar = (ProgressBar) findViewById(R.id.progress_bar);
 
-        initializeWebView();
+        setupActionBar();
 
         // Catch notification click
         onNewIntent(getIntent());
@@ -86,6 +93,41 @@ public class MainActivity extends ActionBarActivity {
         } else {
             Log.i(TAG, "No valid Google Play Services APK found.");
         }
+
+        mWebView = (WebView) findViewById(R.id.webView);
+        WebSettings webSettings = mWebView.getSettings();
+        webSettings.setJavaScriptEnabled(true);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+            mWebView.addJavascriptInterface(new WebViewInterface(this), "AndroidApp");
+        }
+
+        // Make sure logged in state is taken into account when menu is inflated
+        resumeLoggedInState();
+
+        // Check backend login trafic status if logged in
+        if (isLoggedIn()) {
+            new CheckServiceLoginState().execute();
+        }
+    }
+
+    /**
+     * Starts the web view.
+     */
+    @Override
+    protected void onStart() {
+        super.onStart();
+        if (!webViewLoading) {
+            initializeWebView();
+        }
+    }
+
+    /**
+     * Does the actions when activity is stopped. Clears the vew view.
+     */
+    @Override
+    protected void onStop() {
+        super.onStop();
+        mWebView.loadUrl("about:blank");
     }
 
     /**
@@ -100,11 +142,31 @@ public class MainActivity extends ActionBarActivity {
      * Initializes the web view for the first time when the app is opened
      */
     private void initializeWebView() {
-        mWebView = (WebView) findViewById(R.id.webView);
-        WebSettings webSettings = mWebView.getSettings();
-        webSettings.setJavaScriptEnabled(true);
+
+        // Progress bar
+        final Activity activity = this;
+        mProgressBar.setVisibility(View.VISIBLE);
+
+        mWebView.setWebChromeClient(new WebChromeClient() {
+            public void onProgressChanged(WebView view, int progress) {
+                if (progress < 80) {
+                    mProgressBar.setVisibility(View.VISIBLE);
+                }
+                //Make the bar disappear after URL is loaded, and changes string to Loading...
+//                MainActivity.setTitle("Loading...");
+                mProgressBar.setProgress((int) Math.round(((double) progress / 100.0) * (double) mProgressBar.getMax()));
+
+                // Return the app name after finish loading
+                if (progress == 100) {
+                    mProgressBar.setVisibility(View.GONE);
+                    webViewLoading = false;
+                }
+            }
+        });
+
         mWebView.clearCache(true);
         mWebView.loadUrl("http://mealbookers.net/#/menu/today?source=android");
+        webViewLoading = true;
     }
 
     /**
@@ -113,6 +175,7 @@ public class MainActivity extends ActionBarActivity {
      * @param password
      */
     private void loginToMealbookersWebView(String email, String password) {
+        Log.i(TAG, "Logging in to vew view");
         try {
             mWebView.clearCache(true);
             mWebView.loadUrl("about:blank");
@@ -120,7 +183,8 @@ public class MainActivity extends ActionBarActivity {
                             + "&email=" + URLEncoder.encode(email, "UTF-8")
                             + "&password=" + URLEncoder.encode(password, "UTF-8")
             );
-            Toast.makeText(getApplicationContext(), R.string.sign_in_successful, Toast.LENGTH_LONG).show();
+            webViewLoading = true;
+//            Toast.makeText(getApplicationContext(), R.string.sign_in_successful, Toast.LENGTH_LONG).show();
 //            startMealbookersService();
 
             registerInBackground();
@@ -135,6 +199,7 @@ public class MainActivity extends ActionBarActivity {
         mWebView.loadUrl("about:blank");
         Log.d("acceptSuggestionInMealbookersWebView", "http://mealbookers.net/#/menu/suggestion/accept/" + token + "?source=android");
         mWebView.loadUrl("http://mealbookers.net/#/menu/suggestion/accept/" + token + "?source=android");
+        webViewLoading = true;
     }
 
     /**
@@ -156,6 +221,8 @@ public class MainActivity extends ActionBarActivity {
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
         getMenuInflater().inflate(R.menu.main, menu);
+        mMenu = menu;
+        doMenuChanges();
         return true;
     }
 
@@ -167,6 +234,10 @@ public class MainActivity extends ActionBarActivity {
         int id = item.getItemId();
         if (id == R.id.action_login) {
             openLogin();
+            return true;
+        }
+        else if (id == R.id.action_logout) {
+            logout();
             return true;
         }
         return super.onOptionsItemSelected(item);
@@ -187,10 +258,6 @@ public class MainActivity extends ActionBarActivity {
         switch(requestCode) {
             case (REQUEST_CODE_LOGIN) : {
                 if (resultCode == Activity.RESULT_OK) {
-
-                    final SharedPreferences prefs = this.getSharedPreferences(LoginActivity.PREFERENCES_FILENAME, Context.MODE_PRIVATE);
-                    prefs.edit().putInt("sync-time", (int)(System.currentTimeMillis() / 1000L) - 60*10).apply();
-
                     String email = data.getStringExtra("email");
                     String password = data.getStringExtra("password");
                     loginToMealbookersWebView(email, password);
@@ -245,7 +312,7 @@ public class MainActivity extends ActionBarActivity {
      *         registration ID.
      */
     private String getRegistrationId(Context context) {
-        final SharedPreferences prefs = getGCMPreferences(context);
+        final SharedPreferences prefs = getPreferences(context);
         String registrationId = prefs.getString(PROPERTY_REG_ID, "");
         if (registrationId.isEmpty()) {
             Log.i(TAG, "Registration not found.");
@@ -266,7 +333,7 @@ public class MainActivity extends ActionBarActivity {
     /**
      * @return Application's {@code SharedPreferences}.
      */
-    private SharedPreferences getGCMPreferences(Context context) {
+    private SharedPreferences getPreferences(Context context) {
         // This sample app persists the registration ID in shared preferences, but
         // how you store the registration ID in your app is up to you.
         return getSharedPreferences(MainActivity.class.getSimpleName(),
@@ -343,7 +410,7 @@ public class MainActivity extends ActionBarActivity {
      * @param regId registration ID
      */
     private void storeRegistrationId(Context context, String regId) {
-        final SharedPreferences prefs = getGCMPreferences(context);
+        final SharedPreferences prefs = getPreferences(context);
         int appVersion = getAppVersion(context);
         Log.i(TAG, "Saving regId on app version " + appVersion);
         SharedPreferences.Editor editor = prefs.edit();
@@ -365,6 +432,120 @@ public class MainActivity extends ActionBarActivity {
             Log.i(TAG, "Not logged in to backend, unable to send gcm regid");
         } catch (Exception e) {
             Log.e(TAG, "Sending GCM regid to backend failed", e);
+        }
+    }
+
+    /**
+     * Logs the user out. Called from menu.
+     */
+    private void logout() {
+        mWebView.clearCache(true);
+        mWebView.loadUrl("about:blank");
+        mWebView.loadUrl("http://mealbookers.net/#/menu/today?source=android&logout=1");
+        onLogout();
+    }
+
+    /**
+     * Makes differences in UI and saves the state.
+     */
+    public void onLogin() {
+        Log.i("Menu", "logged in");
+        invalidateOptionsMenu();
+        saveLoggedInState(true);
+    }
+
+    /**
+     * Makes differences in UI and saves the state. Called from Web View.
+     */
+    public void onLogout() {
+        Log.i("Menu", "logged out");
+        invalidateOptionsMenu();
+        MealbookersGateway.logout(getApplicationContext());
+        saveLoggedInState(false);
+    }
+
+    /**
+     * Does changes to menu
+     */
+    private void doMenuChanges() {
+        Log.d("Menu", "doMenuChanges");
+        if (isLoggedIn()) {
+            doLoginUIChanges();
+        }
+        else {
+            doLogoutUIChanges();
+        }
+    }
+
+    /**
+     * Does the UI (menu) changes that are needed when logged in
+     */
+    private void doLoginUIChanges() {
+        Log.d("Menu", "doLoginUIChanges start");
+        if (mMenu != null) {
+            Log.d("Menu", "doLoginUIChanges do");
+            mMenu.findItem(R.id.action_login).setVisible(false);
+            mMenu.findItem(R.id.action_logout).setVisible(true);
+        }
+    }
+
+    /**
+     * Does the UI (menu) changes that are needed when logged out
+     */
+    private void doLogoutUIChanges() {
+        Log.d("Menu", "doLogoutUIChanges start");
+        if (mMenu != null) {
+            Log.d("Menu", "doLogoutUIChanges do");
+            mMenu.findItem(R.id.action_login).setVisible(true);
+            mMenu.findItem(R.id.action_logout).setVisible(false);
+        }
+    }
+
+    /**
+     * Saves logged in state
+     * @param state
+     */
+    public void saveLoggedInState(boolean state) {
+        getPreferences(context).edit().putBoolean("logged-in-state", state).commit();
+    }
+
+    /**
+     * Resumes from the logged in state
+     */
+    private void resumeLoggedInState() {
+        Log.d("Menu", "resumeLoggedInState");
+        invalidateOptionsMenu();
+    }
+
+    private boolean isLoggedIn() {
+        return getPreferences(context).getBoolean("logged-in-state", false);
+    }
+
+    /**
+     * Checks from the backend if the service traffic is logged in. If not -> log out web view too.
+     */
+    public class CheckServiceLoginState extends AsyncTask<Void, Void, Integer> {
+
+        @Override
+        protected Integer doInBackground(Void... params) {
+            try {
+                MealbookersGateway.getUser(MainActivity.this);
+                return 1;
+            }
+            catch (ForbiddenException e) {
+                return 0;
+            }
+            catch (Exception e) {
+                return 1;
+            }
+        }
+
+        @Override
+        protected void onPostExecute(final Integer result) {
+            if (result == 0) {
+                Log.i(TAG, "Service trafic got HTTP 403 -> logging out");
+                logout();
+            }
         }
     }
 }

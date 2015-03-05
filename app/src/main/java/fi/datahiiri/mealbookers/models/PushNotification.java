@@ -22,4 +22,5 @@ public class PushNotification {
     public String suggestion_time_str;
     public String restaurant_name_str;
     public String other_user_first_name;
+    public String menu;
 }

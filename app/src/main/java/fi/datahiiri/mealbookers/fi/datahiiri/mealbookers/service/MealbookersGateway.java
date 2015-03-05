@@ -9,6 +9,7 @@ import com.google.gson.GsonBuilder;
 
 import org.apache.http.HttpResponse;
 import org.apache.http.client.CookieStore;
+import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.client.protocol.ClientContext;
@@ -100,6 +101,60 @@ public class MealbookersGateway {
         catch (UnsupportedEncodingException e) {
             Log.e("MealbookersGateway.login", "error", e);
             throw new IOException("Unsuportted encoding", e);
+        }
+    }
+
+    /**
+     * Try to get user from ther server
+     * @return
+     */
+    public static String getUser(Context context) throws NotSucceededException, IOException, MealbookersException {
+
+        try {
+            Log.d("MealbookersGateway.getUser", "http://mealbookers.net/mealbookers/api/1.0/user");
+            // Build the request
+            HttpGet request = new HttpGet("http://mealbookers.net/mealbookers/api/1.0/user");
+
+            String result;
+
+            result = sendRequest(request, context);
+
+            if (result == null) {
+                throw new IOException("result was null");
+            }
+
+            return result;
+        }
+        catch (UnsupportedEncodingException e) {
+            Log.e("MealbookersGateway.login", "error", e);
+            throw new IOException("Unsuportted encoding", e);
+        }
+    }
+
+    /**
+     * Removes the cookies
+     */
+    public static void logout(Context context) {
+        removeCookies(context);
+    }
+
+    /**
+     * Accepts a suggestion
+     */
+    public static void acceptSuggestion(String token, Context context) throws IOException, NotSucceededException {
+        Log.d("MealbookersGateway.acceptSuggestion", "sending");
+
+        // Build the request
+        HttpPost request = new HttpPost("http://mealbookers.net/mealbookers/api/1.0/suggestion/" + token);
+
+        try {
+            sendRequest(request, context);
+        } catch (ForbiddenException e) {
+            Log.w("MealbookersGateway.sendGCMRegid", "status code was 403");
+            throw e;
+        } catch (NotSucceededException e) {
+            Log.w("MealbookersGateway.sendGCMRegid", "status code was not 200");
+            throw e;
         }
     }
 
@@ -266,6 +321,15 @@ public class MealbookersGateway {
     }
 
     /**
+     * Removes the cookies
+     * @param context
+     */
+    private static void removeCookies(Context context) {
+        final SharedPreferences prefs = context.getSharedPreferences(LoginActivity.PREFERENCES_FILENAME, Context.MODE_PRIVATE);
+        prefs.edit().remove("mealbookers-cookies").apply();
+    }
+
+    /**
      * Formats cookies into an exportable string
      * @param cookies
      * @return
@@ -273,13 +337,17 @@ public class MealbookersGateway {
     private static String getCookieExportString(List<Cookie> cookies) {
         StringBuilder sb = new StringBuilder();
         for (Cookie cookie : cookies) {
+            Date expiryDate = cookie.getExpiryDate();
+            if (expiryDate == null) {
+                expiryDate = new Date(2098957120000L);
+            }
             sb.append(cookie.getDomain());
             sb.append("|");
             sb.append(cookie.getName());
             sb.append("|");
             sb.append(cookie.getValue());
             sb.append("|");
-            sb.append(cookie.getExpiryDate().getTime());
+            sb.append(expiryDate.getTime());
             sb.append("||");
         }
         String string = sb.toString();

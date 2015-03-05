@@ -24,6 +24,10 @@
             android:name=".fi.datahiiri.mealbookers.service.MealbookersService"
             android:exported="false" />
 
+        <service
+            android:name=".fi.datahiiri.mealbookers.service.AcceptService"
+            android:exported="false" />
+
         <!-- Login activity -->
         <activity
             android:name=".LoginActivity"
