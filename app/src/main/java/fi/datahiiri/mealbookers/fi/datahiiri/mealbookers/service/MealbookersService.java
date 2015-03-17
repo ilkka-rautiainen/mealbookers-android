@@ -196,7 +196,8 @@ public class MealbookersService extends IntentService {
                         .setSmallIcon(R.drawable.ic_notification)
                         .setContentTitle(title)
                         .setContentText(text)
-                        .setAutoCancel(true);
+                        .setAutoCancel(true)
+                        .setColor(getResources().getColor(R.color.primary_dark));
 
 
         // Content action
