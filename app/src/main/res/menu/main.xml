@@ -12,4 +12,14 @@
         android:title="@string/action_logout"
         android:orderInCategory="200"
         app:showAsAction="never" />
+
+    <item android:id="@+id/action_register"
+        android:title="@string/action_register"
+        android:orderInCategory="300"
+        app:showAsAction="never" />
+
+    <item android:id="@+id/action_groups"
+        android:title="@string/action_groups"
+        android:orderInCategory="50"
+        app:showAsAction="always" />
 </menu>

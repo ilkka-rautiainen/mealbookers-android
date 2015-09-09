@@ -190,14 +190,14 @@ public class MainActivity extends ActionBarActivity {
             registerInBackground();
         }
         catch (UnsupportedEncodingException e) {
-            Log.e("loginToMealbookersWebView", "encoding error", e);
+            Log.e("loginToMealbookersWebVi", "encoding error", e);
             Toast.makeText(getApplicationContext(), R.string.sign_in_failed, Toast.LENGTH_SHORT).show();
         }
     }
     private void acceptSuggestionInMealbookersWebView(String token) {
         mWebView.clearCache(true);
         mWebView.loadUrl("about:blank");
-        Log.d("acceptSuggestionInMealbookersWebView", "http://mealbookers.net/#/menu/suggestion/accept/" + token + "?source=android");
+        Log.d("acceptSuggestion", "http://mealbookers.net/#/menu/suggestion/accept/" + token + "?source=android");
         mWebView.loadUrl("http://mealbookers.net/#/menu/suggestion/accept/" + token + "?source=android");
         webViewLoading = true;
     }
@@ -240,6 +240,14 @@ public class MainActivity extends ActionBarActivity {
             logout();
             return true;
         }
+        else if (id == R.id.action_register) {
+            openRegister();
+            return true;
+        }
+        else if (id == R.id.action_groups) {
+            openGroups();
+            return true;
+        }
         return super.onOptionsItemSelected(item);
     }
 
@@ -249,6 +257,26 @@ public class MainActivity extends ActionBarActivity {
     private void openLogin() {
         Intent intent = new Intent(this, LoginActivity.class);
         startActivityForResult(intent, REQUEST_CODE_LOGIN);
+    }
+
+    /**
+     * Opens register screen
+     */
+    private void openRegister() {
+        Log.i(TAG, "Registering in to vew view");
+        mWebView.clearCache(true);
+        mWebView.loadUrl("about:blank");
+        mWebView.loadUrl("http://mealbookers.net/#/menu/today/register?source=android");
+        webViewLoading = true;
+    }
+
+    /**
+     * Open gruops screen
+     */
+    private void openGroups() {
+        Log.i(TAG, "Opening groups view to vew view");
+        mWebView.loadUrl("http://mealbookers.net/#/menu/today/settings/groups?source=android");
+        webViewLoading = true;
     }
 
     @Override
@@ -486,6 +514,8 @@ public class MainActivity extends ActionBarActivity {
             Log.d("Menu", "doLoginUIChanges do");
             mMenu.findItem(R.id.action_login).setVisible(false);
             mMenu.findItem(R.id.action_logout).setVisible(true);
+            mMenu.findItem(R.id.action_register).setVisible(false);
+            mMenu.findItem(R.id.action_groups).setVisible(true);
         }
     }
 
@@ -498,6 +528,8 @@ public class MainActivity extends ActionBarActivity {
             Log.d("Menu", "doLogoutUIChanges do");
             mMenu.findItem(R.id.action_login).setVisible(true);
             mMenu.findItem(R.id.action_logout).setVisible(false);
+            mMenu.findItem(R.id.action_register).setVisible(true);
+            mMenu.findItem(R.id.action_groups).setVisible(false);
         }
     }
 
