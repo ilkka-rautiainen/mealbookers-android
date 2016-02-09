@@ -37,6 +37,7 @@ import fi.datahiiri.mealbookers.exceptions.ConflictException;
 import fi.datahiiri.mealbookers.exceptions.ForbiddenException;
 import fi.datahiiri.mealbookers.exceptions.MealbookersException;
 import fi.datahiiri.mealbookers.exceptions.NotSucceededException;
+import fi.datahiiri.mealbookers.models.AcceptSuggestionResult;
 import fi.datahiiri.mealbookers.models.BasicResult;
 
 /**
@@ -54,7 +55,7 @@ public class MealbookersGateway {
     public static boolean login(String email, String password, Context context) throws NotSucceededException, IOException, MealbookersException {
 
         try {
-            Log.d("MealbookersGateway.login", "http://mealbookers.net/mealbookers/api/1.0/user/login");
+            Log.d("MealbookersGateway", "http://mealbookers.net/mealbookers/api/1.0/user/login");
             // Build the request
             HttpPost request = new HttpPost("http://mealbookers.net/mealbookers/api/1.0/user/login");
 
@@ -73,7 +74,7 @@ public class MealbookersGateway {
                 result = sendRequest(request, context);
             }
             catch (ConflictException e) {
-                Log.w("MealbookersGateway.login", "login failed");
+                Log.w("MealbookersGateway", "login failed");
                 return false;
             }
 
@@ -95,11 +96,11 @@ public class MealbookersGateway {
             }
         }
         catch (JSONException e) {
-            Log.e("MealbookersGateway.login", "error", e);
+            Log.e("MealbookersGateway", "error", e);
             throw new IOException("Json exception", e);
         }
         catch (UnsupportedEncodingException e) {
-            Log.e("MealbookersGateway.login", "error", e);
+            Log.e("MealbookersGateway", "error", e);
             throw new IOException("Unsuportted encoding", e);
         }
     }
@@ -111,7 +112,7 @@ public class MealbookersGateway {
     public static String getUser(Context context) throws NotSucceededException, IOException, MealbookersException {
 
         try {
-            Log.d("MealbookersGateway.getUser", "http://mealbookers.net/mealbookers/api/1.0/user");
+            Log.d("MealbookersGateway", "http://mealbookers.net/mealbookers/api/1.0/user");
             // Build the request
             HttpGet request = new HttpGet("http://mealbookers.net/mealbookers/api/1.0/user");
 
@@ -126,7 +127,7 @@ public class MealbookersGateway {
             return result;
         }
         catch (UnsupportedEncodingException e) {
-            Log.e("MealbookersGateway.login", "error", e);
+            Log.e("MealbookersGateway", "error", e);
             throw new IOException("Unsuportted encoding", e);
         }
     }
@@ -140,21 +141,35 @@ public class MealbookersGateway {
 
     /**
      * Accepts a suggestion
+     * @return suggestion time as hh:mm
      */
-    public static void acceptSuggestion(String token, Context context) throws IOException, NotSucceededException {
-        Log.d("MealbookersGateway.acceptSuggestion", "sending");
+    public static String acceptSuggestion(String token, Context context) throws IOException, NotSucceededException {
+        Log.d("MealbookersGateway", "sending");
 
         // Build the request
         HttpPost request = new HttpPost("http://mealbookers.net/mealbookers/api/1.0/suggestion/" + token);
 
+        String result;
         try {
-            sendRequest(request, context);
+            result = sendRequest(request, context);
         } catch (ForbiddenException e) {
-            Log.w("MealbookersGateway.sendGCMRegid", "status code was 403");
+            Log.w("MealbookersGateway", "status code was 403");
             throw e;
         } catch (NotSucceededException e) {
-            Log.w("MealbookersGateway.sendGCMRegid", "status code was not 200");
+            Log.w("MealbookersGateway", "status code was not 200");
             throw e;
+        }
+
+        if (result == null) {
+            return "";
+        }
+
+        AcceptSuggestionResult acceptSuggestionResult = getGson().fromJson(result, AcceptSuggestionResult.class);
+        if (acceptSuggestionResult != null) {
+            return acceptSuggestionResult.time;
+        }
+        else {
+            return "";
         }
     }
 
@@ -165,7 +180,7 @@ public class MealbookersGateway {
     public static void sendGCMRegid(String regid, Context context) throws NotSucceededException, IOException, MealbookersException {
 
         try {
-            Log.d("MealbookersGateway.sendGCMRegid", "sending");
+            Log.d("MealbookersGateway", "sending");
 
             // Build the request
             HttpPost request = new HttpPost("http://mealbookers.net/mealbookers/api/1.0/user/registerAndroidGCM");

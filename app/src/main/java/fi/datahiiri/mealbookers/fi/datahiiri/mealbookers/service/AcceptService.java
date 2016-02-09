@@ -29,18 +29,24 @@ public class AcceptService extends IntentService {
             return;
         }
 
-        Log.d("AcceptService.onHandleIntent", "token: " + token);
+        Log.d("AcceptService", "token: " + token);
 
         try {
-            MealbookersGateway.acceptSuggestion(token, this);
-            mHandler.post(new DisplayToast(this, "Suggestion accepted"));
+            String time = MealbookersGateway.acceptSuggestion(token, this);
+            if (time == null) {
+                time = "";
+            }
+            else {
+                time = ", " + time;
+            }
+            mHandler.post(new DisplayToast(this, "Suggestion accepted" + time));
         }
         catch (ForbiddenException e) {
-            Log.e("AcceptService.onHandleIntent", "forbidden", e);
+            Log.e("AcceptService", "forbidden", e);
             mHandler.post(new DisplayToast(this, "You've been logged out"));
         }
         catch (Exception e) {
-            Log.e("AcceptService.onHandleIntent", "error", e);
+            Log.e("AcceptService", "error", e);
             mHandler.post(new DisplayToast(this, "Accepting the suggestion failed"));
         }
         MainActivity.cancelNotification(this, MainActivity.NOTIFICATION_ID);
